@@ -1,0 +1,659 @@
+import tkinter as tk
+import math
+import re
+
+
+# ============================================================
+# PINK MODERN SCIENTIFIC CALCULATOR
+# ============================================================
+
+class PinkCalculator:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Pink Calculator")
+        self.root.geometry("1050x700")
+        self.root.minsize(900, 600)
+        self.root.configure(bg="#120b14")
+
+        self.expression = ""
+        self.memory = 0
+        self.history = []
+        self.angle_mode = "DEG"
+
+        # ---------------- COLORS ----------------
+        self.bg = "#120b14"
+        self.panel = "#1d121d"
+        self.display_bg = "#241624"
+
+        self.pink = "#ff4fa3"
+        self.light_pink = "#ff86c8"
+        self.hot_pink = "#ff2f92"
+        self.soft_pink = "#ffb7dc"
+
+        self.text = "#fff5fb"
+        self.muted = "#b99aaa"
+
+        self.button = "#2b1a2a"
+        self.button_hover = "#3b2238"
+        self.operator = "#6b2851"
+        self.special = "#44243b"
+
+        self.build_ui()
+        self.bind_keyboard()
+
+    # ========================================================
+    # UI
+    # ========================================================
+
+    def build_ui(self):
+        # Main container
+        main = tk.Frame(self.root, bg=self.bg)
+        main.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # ---------------- LEFT SIDE ----------------
+        left = tk.Frame(main, bg=self.bg)
+        left.pack(side="left", fill="both", expand=True)
+
+        # Header
+        header = tk.Frame(left, bg=self.bg)
+        header.pack(fill="x", pady=(0, 12))
+
+        title = tk.Label(
+            header,
+            text="PINK CALCULATOR",
+            font=("Segoe UI", 24, "bold"),
+            fg=self.pink,
+            bg=self.bg
+        )
+        title.pack(side="left")
+
+        self.mode_label = tk.Label(
+            header,
+            text="DEG",
+            font=("Segoe UI", 11, "bold"),
+            fg=self.soft_pink,
+            bg=self.bg
+        )
+        self.mode_label.pack(side="right", padx=10)
+
+        # Display
+        display_frame = tk.Frame(
+            left,
+            bg=self.display_bg,
+            highlightbackground="#5a2949",
+            highlightthickness=1
+        )
+        display_frame.pack(fill="x", pady=(0, 15))
+
+        self.history_display = tk.Label(
+            display_frame,
+            text="",
+            anchor="e",
+            font=("Segoe UI", 11),
+            fg=self.muted,
+            bg=self.display_bg
+        )
+        self.history_display.pack(fill="x", padx=20, pady=(12, 0))
+
+        self.display = tk.Label(
+            display_frame,
+            text="0",
+            anchor="e",
+            font=("Segoe UI", 32, "bold"),
+            fg=self.text,
+            bg=self.display_bg
+        )
+        self.display.pack(fill="x", padx=20, pady=(5, 18))
+
+        # Buttons
+        buttons = tk.Frame(left, bg=self.bg)
+        buttons.pack(fill="both", expand=True)
+
+        layout = [
+            ["MC", "MR", "M+", "M-", "⌫", "C"],
+            ["sin", "cos", "tan", "log", "ln", "√"],
+            ["asin", "acos", "atan", "x²", "xʸ", "1/x"],
+            ["π", "e", "(", ")", "%", "÷"],
+            ["7", "8", "9", "!", "±", "×"],
+            ["4", "5", "6", "Ans", ".", "−"],
+            ["1", "2", "3", "00", "=", "+"],
+            ["0", "00", "EXP", "DEG/RAD", "⌫", "="]
+        ]
+
+        for r, row in enumerate(layout):
+            buttons.rowconfigure(r, weight=1)
+
+            for c, char in enumerate(row):
+                buttons.columnconfigure(c, weight=1)
+
+                btn = tk.Button(
+                    buttons,
+                    text=char,
+                    font=("Segoe UI", 13, "bold"),
+                    fg=self.text,
+                    bg=self.get_button_color(char),
+                    activeforeground="white",
+                    activebackground=self.hot_pink,
+                    bd=0,
+                    relief="flat",
+                    cursor="hand2",
+                    command=lambda x=char: self.button_click(x)
+                )
+
+                btn.grid(
+                    row=r,
+                    column=c,
+                    sticky="nsew",
+                    padx=4,
+                    pady=4
+                )
+
+                self.add_hover(btn, char)
+
+        # ---------------- RIGHT SIDE ----------------
+        right = tk.Frame(
+            main,
+            bg=self.panel,
+            width=280
+        )
+        right.pack(side="right", fill="y", padx=(18, 0))
+        right.pack_propagate(False)
+
+        history_title = tk.Label(
+            right,
+            text="CALCULATION HISTORY",
+            font=("Segoe UI", 13, "bold"),
+            fg=self.pink,
+            bg=self.panel
+        )
+        history_title.pack(anchor="w", padx=18, pady=(20, 10))
+
+        self.history_box = tk.Listbox(
+            right,
+            bg="#171017",
+            fg=self.text,
+            selectbackground=self.hot_pink,
+            selectforeground="white",
+            font=("Consolas", 10),
+            bd=0,
+            highlightthickness=0
+        )
+        self.history_box.pack(
+            fill="both",
+            expand=True,
+            padx=15,
+            pady=5
+        )
+
+        clear_history = tk.Button(
+            right,
+            text="Clear History",
+            command=self.clear_history,
+            font=("Segoe UI", 10, "bold"),
+            fg=self.text,
+            bg=self.operator,
+            activebackground=self.hot_pink,
+            activeforeground="white",
+            bd=0,
+            cursor="hand2"
+        )
+        clear_history.pack(fill="x", padx=15, pady=15, ipady=9)
+
+        # Info
+        info = tk.Label(
+            right,
+            text="Keyboard supported\n\n"
+                 "Enter  → Calculate\n"
+                 "Esc    → Clear\n"
+                 "Backspace → Delete\n\n"
+                 "Scientific mode included",
+            justify="left",
+            font=("Segoe UI", 9),
+            fg=self.muted,
+            bg=self.panel
+        )
+        info.pack(anchor="w", padx=18, pady=(0, 20))
+
+    # ========================================================
+    # BUTTON COLORS
+    # ========================================================
+
+    def get_button_color(self, char):
+        if char in ["=", "+", "−", "×", "÷", "%"]:
+            return self.operator
+
+        if char in [
+            "MC", "MR", "M+", "M-", "C", "⌫",
+            "sin", "cos", "tan", "log", "ln",
+            "√", "asin", "acos", "atan",
+            "x²", "xʸ", "1/x", "DEG/RAD"
+        ]:
+            return self.special
+
+        return self.button
+
+    # ========================================================
+    # HOVER EFFECT
+    # ========================================================
+
+    def add_hover(self, button, char):
+        normal = self.get_button_color(char)
+
+        def enter(event):
+            button.configure(bg=self.button_hover)
+
+        def leave(event):
+            button.configure(bg=normal)
+
+        button.bind("<Enter>", enter)
+        button.bind("<Leave>", leave)
+
+    # ========================================================
+    # BUTTON HANDLER
+    # ========================================================
+
+    def button_click(self, char):
+
+        if char == "C":
+            self.clear()
+            return
+
+        if char == "⌫":
+            self.backspace()
+            return
+
+        if char == "=":
+            self.calculate()
+            return
+
+        if char == "DEG/RAD":
+            self.toggle_angle()
+            return
+
+        if char == "MC":
+            self.memory = 0
+            return
+
+        if char == "MR":
+            self.insert(str(self.memory))
+            return
+
+        if char == "M+":
+            try:
+                self.memory += self.evaluate()
+            except:
+                pass
+            return
+
+        if char == "M-":
+            try:
+                self.memory -= self.evaluate()
+            except:
+                pass
+            return
+
+        if char == "Ans":
+            if self.history:
+                self.insert(str(self.history[-1][1]))
+            return
+
+        if char == "π":
+            self.insert("π")
+            return
+
+        if char == "e":
+            self.insert("e")
+            return
+
+        if char == "√":
+            self.insert("√(")
+            return
+
+        if char == "x²":
+            self.insert("^2")
+            return
+
+        if char == "xʸ":
+            self.insert("^")
+            return
+
+        if char == "1/x":
+            self.insert("1/(")
+            return
+
+        if char == "!":
+            self.insert("!")
+            return
+
+        if char == "±":
+            if self.expression:
+                self.expression = f"-({self.expression})"
+                self.update_display()
+            return
+
+        if char == "sin":
+            self.insert("sin(")
+            return
+
+        if char == "cos":
+            self.insert("cos(")
+            return
+
+        if char == "tan":
+            self.insert("tan(")
+            return
+
+        if char == "asin":
+            self.insert("asin(")
+            return
+
+        if char == "acos":
+            self.insert("acos(")
+            return
+
+        if char == "atan":
+            self.insert("atan(")
+            return
+
+        if char == "log":
+            self.insert("log(")
+            return
+
+        if char == "ln":
+            self.insert("ln(")
+            return
+
+        if char == "×":
+            self.insert("*")
+            return
+
+        if char == "÷":
+            self.insert("/")
+            return
+
+        if char == "−":
+            self.insert("-")
+            return
+
+        if char == "%":
+            self.insert("%")
+            return
+
+        self.insert(char)
+
+    # ========================================================
+    # INSERT
+    # ========================================================
+
+    def insert(self, value):
+        self.expression += value
+        self.update_display()
+
+    # ========================================================
+    # DISPLAY
+    # ========================================================
+
+    def update_display(self):
+        self.display.config(
+            text=self.expression if self.expression else "0"
+        )
+
+    # ========================================================
+    # CLEAR
+    # ========================================================
+
+    def clear(self):
+        self.expression = ""
+        self.history_display.config(text="")
+        self.update_display()
+
+    # ========================================================
+    # BACKSPACE
+    # ========================================================
+
+    def backspace(self):
+        self.expression = self.expression[:-1]
+        self.update_display()
+
+    # ========================================================
+    # ANGLE MODE
+    # ========================================================
+
+    def toggle_angle(self):
+        self.angle_mode = "RAD" if self.angle_mode == "DEG" else "DEG"
+        self.mode_label.config(text=self.angle_mode)
+
+    # ========================================================
+    # SAFE MATH EVALUATION
+    # ========================================================
+
+    def evaluate(self):
+
+        expr = self.expression
+
+        if not expr:
+            return 0
+
+        expr = expr.replace("π", "pi")
+        expr = expr.replace("√", "sqrt")
+        expr = expr.replace("^", "**")
+
+        # Percentage
+        expr = re.sub(
+            r"(\d+(?:\.\d+)?)%",
+            r"(\1/100)",
+            expr
+        )
+
+        # Factorial
+        expr = re.sub(
+            r"(\d+(?:\.\d+)?)!",
+            r"factorial(\1)",
+            expr
+        )
+
+        # Functions
+        def sin(x):
+            return math.sin(
+                math.radians(x)
+                if self.angle_mode == "DEG"
+                else x
+            )
+
+        def cos(x):
+            return math.cos(
+                math.radians(x)
+                if self.angle_mode == "DEG"
+                else x
+            )
+
+        def tan(x):
+            return math.tan(
+                math.radians(x)
+                if self.angle_mode == "DEG"
+                else x
+            )
+
+        def asin(x):
+            result = math.asin(x)
+            return (
+                math.degrees(result)
+                if self.angle_mode == "DEG"
+                else result
+            )
+
+        def acos(x):
+            result = math.acos(x)
+            return (
+                math.degrees(result)
+                if self.angle_mode == "DEG"
+                else result
+            )
+
+        def atan(x):
+            result = math.atan(x)
+            return (
+                math.degrees(result)
+                if self.angle_mode == "DEG"
+                else result
+            )
+
+        allowed = {
+            "sin": sin,
+            "cos": cos,
+            "tan": tan,
+            "asin": asin,
+            "acos": acos,
+            "atan": atan,
+            "log": math.log10,
+            "ln": math.log,
+            "sqrt": math.sqrt,
+            "factorial": math.factorial,
+            "pi": math.pi,
+            "e": math.e,
+            "abs": abs,
+            "floor": math.floor,
+            "ceil": math.ceil
+        }
+
+        # Basic safety check
+        if not re.fullmatch(
+            r"[0-9a-zA-Z_+\-*/().,%\s]+",
+            expr
+        ):
+            raise ValueError("Invalid expression")
+
+        return eval(
+            expr,
+            {"__builtins__": {}},
+            allowed
+        )
+
+    # ========================================================
+    # CALCULATE
+    # ========================================================
+
+    def calculate(self):
+
+        try:
+            original = self.expression
+
+            result = self.evaluate()
+
+            if isinstance(result, float):
+                if result.is_integer():
+                    result = int(result)
+                else:
+                    result = round(result, 12)
+
+            self.history.append((original, result))
+
+            self.history_display.config(
+                text=original
+            )
+
+            self.history_box.insert(
+                tk.END,
+                f"{original} = {result}"
+            )
+
+            self.history_box.see(tk.END)
+
+            self.expression = str(result)
+            self.update_display()
+
+        except ZeroDivisionError:
+            self.show_error("Cannot divide by zero")
+
+        except ValueError:
+            self.show_error("Invalid calculation")
+
+        except OverflowError:
+            self.show_error("Number too large")
+
+        except Exception:
+            self.show_error("Error")
+
+    # ========================================================
+    # ERROR
+    # ========================================================
+
+    def show_error(self, message):
+        self.history_display.config(text=message)
+        self.display.config(text="ERROR")
+
+    # ========================================================
+    # HISTORY
+    # ========================================================
+
+    def clear_history(self):
+        self.history.clear()
+        self.history_box.delete(0, tk.END)
+        self.history_display.config(text="")
+
+    # ========================================================
+    # KEYBOARD
+    # ========================================================
+
+    def bind_keyboard(self):
+
+        self.root.bind("<Return>", lambda e: self.calculate())
+        self.root.bind("<KP_Enter>", lambda e: self.calculate())
+
+        self.root.bind("<Escape>", lambda e: self.clear())
+
+        self.root.bind(
+            "<BackSpace>",
+            lambda e: self.backspace()
+        )
+
+        for key in "0123456789":
+            self.root.bind(
+                key,
+                lambda e, k=key: self.insert(k)
+            )
+
+        self.root.bind(
+            ".",
+            lambda e: self.insert(".")
+        )
+
+        self.root.bind(
+            "+",
+            lambda e: self.insert("+")
+        )
+
+        self.root.bind(
+            "-",
+            lambda e: self.insert("-")
+        )
+
+        self.root.bind(
+            "*",
+            lambda e: self.insert("*")
+        )
+
+        self.root.bind(
+            "/",
+            lambda e: self.insert("/")
+        )
+
+        self.root.bind(
+            "(",
+            lambda e: self.insert("(")
+        )
+
+        self.root.bind(
+            ")",
+            lambda e: self.insert(")")
+        )
+
+
+# ============================================================
+# RUN
+# ============================================================
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = PinkCalculator(root)
+    root.mainloop()
